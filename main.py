@@ -51,6 +51,17 @@ def start_process_order_with_no_invoice_link(order):
   client_adress = invoice_address["address1"] + " " + invoice_address["address2"]
   county = invoice_address["countyName"]
   city = invoice_address["city"]
+  customer_id = order["customerId"]
+  county_id = invoice_address["countyId"]
+  postal_code = invoice_address["postalCode"]
+  
+  # Handle Bucharest sectors based on postal code
+  if county_id == 12261437:
+    print("Bucharest postal code")
+    sector_digit = postal_code[:2]
+    if sector_digit in ["01", "02", "03", "04", "05", "06"]:
+      sector_number = int(sector_digit)
+      city = f"Sector {sector_number}"
 
   invoice_payload = {
     "cif": cif,
@@ -59,7 +70,9 @@ def start_process_order_with_no_invoice_link(order):
       "address": client_adress,
       "state": county,
       "city": city,
-      "country": "Romania"
+      "country": "Romania",
+      "save": 1,
+      "code": customer_id
     },
     "seriesName": "AAA",
     "products": oblio_prod_list
