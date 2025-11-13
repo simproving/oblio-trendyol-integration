@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from requests.auth import HTTPBasicAuth
 from datetime import date, datetime
+import time
 
 
 def process_order(order):
@@ -82,28 +83,20 @@ def start_process_order_with_no_invoice_link(order):
     f.write(json.dumps(invoice_payload))
     
   # now we send the data to oblio
-    
-
-  url = "https://www.oblio.eu/api/authorize/token"
-  payload = f'client_id={client_id}&client_secret={client_secret}'
-  headers = {
-    'Content-Type': 'application/x-www-form-urlencoded'
-  }
-
-  response_oblio_auth = requests.request("POST", url, headers=headers, data=payload)
-
-  print(response_oblio_auth.text)
 
   headers = {
     'Authorization': f"Bearer {response_oblio_auth.json()["access_token"]}"
   }
 
-  res = requests.get("https://www.oblio.eu/api/nomenclature/companies", headers=headers)
-  print(res.text)
-
   emitere_factura_url = "https://www.oblio.eu/api/docs/invoice"
 
   res2 = requests.request("POST", emitere_factura_url, headers=headers, json=invoice_payload)
+  if res2.status_code == 200:
+    print("Success: Factura emisa")
+  else:
+    print(res2.status_code)
+    print(res2.text)
+    exit("Exiting ... Eroare emitere factura")
 
   print(res2.text)
 
@@ -131,13 +124,13 @@ def start_process_order_with_no_invoice_link(order):
     print("✅ PRICES MATCH!")
   else:
     print(f"❌ PRICE MISMATCH! Difference: {price_difference:.2f} RON")
+    exit("Price match fail")
   print("========================\n")
 
   # Save invoice link to persistent file
   save_invoice_link(shipment_package_id, invoice_link, invoice_number, total_amount)
 
   print(invoice_link)
-  
 
   send_invoice_link_url = f"https://apigw.trendyol.com/integration/sellers/{seller_id}/seller-invoice-links"
   print(send_invoice_link_url)
@@ -151,6 +144,10 @@ def start_process_order_with_no_invoice_link(order):
   }
 
   res3 = requests.request("POST", send_invoice_link_url, headers=headers, json=send_invoice_link_payload, auth=HTTPBasicAuth(api_key, api_secret))
+  if res3.status_code == 201:
+    print("Success: Send invoice link to trendyol")
+  else:
+    exit("Error sending invoice link to trendyol")
 
   print(res3.text)
   with open("current_order_trendyol_invoice_link_response.json", "w", encoding="utf-8") as f:
@@ -273,14 +270,32 @@ cif = os.getenv("CIF")
 client_id = os.getenv("CLIENT_ID")
 client_secret = os.getenv("CLIENT_SECRET")
 
-url = f"https://apigw.trendyol.com/integration/order/sellers/{seller_id}/orders?size=200"
+# Oblio auth
+url = "https://www.oblio.eu/api/authorize/token"
+payload = f'client_id={client_id}&client_secret={client_secret}'
+headers = {
+  'Content-Type': 'application/x-www-form-urlencoded'
+}
 
+response_oblio_auth = requests.request("POST", url, headers=headers, data=payload)
+
+if response_oblio_auth.status_code == 200:
+  print("Success: Oblio auth")
+else:
+  exit("Oblio auth fail")
+
+print(response_oblio_auth.text)
+
+# Get orders trendyol
+url = f"https://apigw.trendyol.com/integration/order/sellers/{seller_id}/orders?size=200"
 
 headers = {
   'User-Agent': f'{seller_id} - SelfIntegration',
 }
 
 response = requests.request("GET", url, headers=headers, auth=HTTPBasicAuth(api_key, api_secret))
+if response.status_code == 200:
+  print("Success: Get trendyol orders")
 
 #to file
 with open("orders.json", "w", encoding="utf-8") as f:
@@ -306,8 +321,10 @@ for order in content_list:
   
   if "invoiceLink" not in order.keys():
     print(f"📋 Processing order {order_id}")
+    
     start_process_order_with_no_invoice_link(order)
-    break # we only do 1 at a time for now
+    #break # we only do 1 at a time for now
+    time.sleep(1)
   else:
     print(f"✅ Order {order_id} already has invoice ... Skipping ...")
   
