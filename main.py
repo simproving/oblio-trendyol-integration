@@ -26,9 +26,11 @@ def process_order(order):
         "discountAllAbove": 1
     }
 
+    discount_value = prod["discountDetails"][0]["lineItemDiscount"]
+
     prod_discount = {
       "name": "Discount",
-      "discount": prod["discountDetails"][0]["lineItemDiscount"] * quantity,
+      "discount": discount_value * quantity,
       "discountType": "valoric"
     }
 
@@ -36,7 +38,8 @@ def process_order(order):
     oblio_prod_list.append(oblio_prod)
 
     # only after the discount
-    oblio_prod_list.append(prod_discount)
+    if discount_value:
+      oblio_prod_list.append(prod_discount)
   
   return oblio_prod_list
 
@@ -91,6 +94,12 @@ def start_process_order_with_no_invoice_link(order):
   emitere_factura_url = "https://www.oblio.eu/api/docs/invoice"
 
   res2 = requests.request("POST", emitere_factura_url, headers=headers, json=invoice_payload)
+
+  if res2.status_code == 429:
+    print("Too many requests, sleeping for 60s...")
+    time.sleep(60)
+    res2 = requests.request("POST", emitere_factura_url, headers=headers, json=invoice_payload)
+
   if res2.status_code == 200:
     print("Success: Factura emisa")
   else:
@@ -144,10 +153,11 @@ def start_process_order_with_no_invoice_link(order):
   }
 
   res3 = requests.request("POST", send_invoice_link_url, headers=headers, json=send_invoice_link_payload, auth=HTTPBasicAuth(api_key, api_secret))
+  print(f"Send invoice link trendyol response status code: {res3.status_code}")
   if res3.status_code == 201:
     print("Success: Send invoice link to trendyol")
   else:
-    exit("Error sending invoice link to trendyol")
+    exit(" ====> Error sending invoice link to trendyol !!! <====")
 
   print(res3.text)
   with open("current_order_trendyol_invoice_link_response.json", "w", encoding="utf-8") as f:
