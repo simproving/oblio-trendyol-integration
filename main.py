@@ -17,6 +17,7 @@ def process_order(order):
     
     oblio_prod = {
         "name": prod["productName"],
+        "code": prod["productCode"],
         "price": prod["amount"],
         "measuringUnit": "buc",
         "vatName": "Normala",
@@ -26,7 +27,8 @@ def process_order(order):
         "discountAllAbove": 1
     }
 
-    discount_value = prod["discountDetails"][0]["lineItemDiscount"]
+    #discount_value = prod["discountDetails"][0]["lineItemDiscount"]
+    discount_value = prod["discount"]
 
     prod_discount = {
       "name": "Discount",
