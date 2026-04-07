@@ -48,39 +48,65 @@ def process_order(order):
 
 def start_process_order_with_no_invoice_link(order):
 
-  # get the invoice data from order
+  # 1. Get the product list from your existing process
   oblio_prod_list = process_order(order)
 
+  # 2. Extract basic address info
   invoice_address = order["invoiceAddress"]
-  client_name = invoice_address["firstName"] + " " + invoice_address["lastName"]
-  client_adress = invoice_address["address1"] + " " + invoice_address["address2"]
-  county = invoice_address["countyName"]
+  country_code = invoice_address.get("countryCode", "RO") # GR, RO, etc.
+  
+  # Determine Country Name and Business Rules based on country code
+  if country_code == "RO":
+      full_country_name = "Romania"
+      series_name = "AAA"
+      language = "RO"
+      currency = "RON"
+  else:
+      full_country_name = "Greece" # Defaulting to Greece for your case
+      series_name = "EXT"      # Standard series for non-RO
+      language = "EN"
+      currency = order.get("currencyCode", "EUR") # Use the currency from the JSON (EUR)
+      if country_code == "GR":
+        full_country_name = "Greece"
+      # Add future countries here
+
+  # 3. Prepare Client Details
+  client_name = f"{invoice_address['firstName']} {invoice_address['lastName']}"
+  # Clean up address: strip whitespace in case address2 is empty
+  client_adress = f"{invoice_address['address1']} {invoice_address['address2']}".strip()
+  
+  # Use stateName for Greece, fallback to countyName for others
+  state = invoice_address.get("stateName") or invoice_address.get("countyName") or ""
   city = invoice_address["city"]
   customer_id = order["customerId"]
   county_id = invoice_address["countyId"]
   postal_code = invoice_address["postalCode"]
-  
-  # Handle Bucharest sectors based on postal code
-  if county_id == 12261437:
-    print("Bucharest postal code")
-    sector_digit = postal_code[:2]
-    if sector_digit in ["01", "02", "03", "04", "05", "06"]:
-      sector_number = int(sector_digit)
-      city = f"Sector {sector_number}"
 
+  # 4. Handle Bucharest sectors (ONLY if it is Romania)
+  if country_code == "RO":
+      if county_id == 12261437:
+          print("Bucharest postal code detected")
+          sector_digit = postal_code[:2]
+          if sector_digit in ["01", "02", "03", "04", "05", "06"]:
+              sector_number = int(sector_digit)
+              city = f"Sector {sector_number}"
+
+  # 5. Construct the final Payload
   invoice_payload = {
-    "cif": cif,
-    "client": {
-      "name": client_name,
-      "address": client_adress,
-      "state": county,
-      "city": city,
-      "country": "Romania",
-      "save": 1,
-      "code": customer_id
-    },
-    "seriesName": "AAA",
-    "products": oblio_prod_list
+      "cif": cif,
+      "client": {
+          "name": client_name,
+          "address": client_adress,
+          "state": state,
+          "city": city,
+          "country": full_country_name,
+          "save": 1,
+          "code": customer_id
+      },
+      "seriesName": series_name,
+      "language": language,
+      "currency": currency,
+      "products": oblio_prod_list
   }
 
   with open("current_order.json", "w", encoding="utf-8") as f:
@@ -126,8 +152,8 @@ def start_process_order_with_no_invoice_link(order):
   
   # Price validation check
   print(f"\n=== PRICE VALIDATION ===")
-  print(f"Trendyol Total: {trendyol_total_price} RON")
-  print(f"Oblio Total: {oblio_total_price} RON")
+  print(f"Trendyol Total: {trendyol_total_price} f{currency}")
+  print(f"Oblio Total: {oblio_total_price} f{currency}")
   
   price_difference = abs(trendyol_total_price - oblio_total_price)
   if price_difference < 0.01:  # Allow for small floating point differences
