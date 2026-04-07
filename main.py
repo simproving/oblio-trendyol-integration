@@ -17,8 +17,8 @@ def process_order(order):
     
     oblio_prod = {
         "name": prod["productName"],
-        "code": prod["productCode"],
-        "price": prod["amount"],
+        "code": prod["contentId"],
+        "price": prod["lineGrossAmount"],
         "measuringUnit": "buc",
         "vatName": "Normala",
         "vatPercentage": 21,
@@ -28,7 +28,7 @@ def process_order(order):
     }
 
     #discount_value = prod["discountDetails"][0]["lineItemDiscount"]
-    discount_value = prod["discount"]
+    discount_value = prod["lineTotalDiscount"]
 
     prod_discount = {
       "name": "Discount",
@@ -47,7 +47,6 @@ def process_order(order):
 
 
 def start_process_order_with_no_invoice_link(order):
-  shipment_package_id = order["id"]
 
   # get the invoice data from order
   oblio_prod_list = process_order(order)
@@ -122,7 +121,7 @@ def start_process_order_with_no_invoice_link(order):
   total_amount = oblio_response["data"]["total"]
 
   # Get Trendyol total price for comparison
-  trendyol_total_price = order["totalPrice"]
+  trendyol_total_price = order["packageTotalPrice"]
   oblio_total_price = float(total_amount)
   
   # Price validation check
@@ -138,6 +137,8 @@ def start_process_order_with_no_invoice_link(order):
     exit("Price match fail")
   print("========================\n")
 
+  shipment_package_id = order["shipmentPackageId"]
+
   # Save invoice link to persistent file
   save_invoice_link(shipment_package_id, invoice_link, invoice_number, total_amount)
 
@@ -148,10 +149,12 @@ def start_process_order_with_no_invoice_link(order):
 
   send_invoice_link_payload = {
     "invoiceLink": invoice_link,
-    "shipmentPackageId": shipment_package_id
+    "shipmentPackageId": int(shipment_package_id)
   }
   headers = {
-  'User-Agent': f'{seller_id} - SelfIntegration',
+  "User-Agent": f'{seller_id} - SelfIntegration',
+  "accept": "application/json",
+  "content-type": "application/json"
   }
 
   res3 = requests.request("POST", send_invoice_link_url, headers=headers, json=send_invoice_link_payload, auth=HTTPBasicAuth(api_key, api_secret))
@@ -318,7 +321,7 @@ data = response.json()
 content_list = data["content"]
 
 for order in content_list:
-  order_id = order.get("id", "Unknown")
+  order_id = order.get("orderNumber", "Unknown")
   
   # Check if order should be skipped due to status
   should_skip, skip_reason, is_cancelled = should_skip_order(order)
