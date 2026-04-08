@@ -62,13 +62,15 @@ def start_process_order_with_no_invoice_link(order):
       language = "RO"
       currency = "RON"
   else:
-      full_country_name = "Greece" # Defaulting to Greece for your case
       series_name = "EXT"      # Standard series for non-RO
       language = "EN"
       currency = order.get("currencyCode", "EUR") # Use the currency from the JSON (EUR)
       if country_code == "GR":
         full_country_name = "Greece"
+      if country_code == "BG":
+        full_country_name = "Bulgaria"
       # Add future countries here
+      assert full_country_name
 
   # 3. Prepare Client Details
   client_name = f"{invoice_address['firstName']} {invoice_address['lastName']}"
